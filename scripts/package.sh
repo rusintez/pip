@@ -22,8 +22,8 @@ xcodebuild -quiet -project Pip.xcodeproj -scheme Pip \
     MARKETING_VERSION="$pip_version" CURRENT_PROJECT_VERSION="$pip_build" build
 
 pip_app='build-release/Build/Products/Release/Pip.app'
-xcrun lipo -verify_arch arm64 "$pip_app/Contents/MacOS/Pip"
-xcrun lipo -verify_arch x86_64 "$pip_app/Contents/MacOS/Pip"
+xcrun lipo "$pip_app/Contents/MacOS/Pip" -verify_arch arm64
+xcrun lipo "$pip_app/Contents/MacOS/Pip" -verify_arch x86_64
 mkdir -p "$pip_app/Contents/Resources"
 cp LICENSE "$pip_app/Contents/Resources/LICENSE.txt"
 # Ad hoc signing needs no certificate. This is not Developer ID signing or notarization.
