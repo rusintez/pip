@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Unit tests
+        run: swift test
+      - name: Build and package universal app
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version=0.1.0
+          if [[ "$REF_TYPE" == tag ]]; then version="${REF_NAME#v}"; fi
+          bash scripts/package.sh "$version"
+      - name: Upload build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Pip-universal
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish experimental release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified build
+        run: gh run download "$GITHUB_RUN_ID" --name Pip-universal --dir dist
+      - name: Verify checksum
+        run: |
+          cd dist
+          sha256sum --check *.sha256
+      - name: Create prerelease
+        run: |
+          cat > release-notes.md <<'NOTES'
+          Experimental macOS 14+ build for Apple Silicon and Intel Macs.
+
+          This app is ad hoc signed, **not Developer ID signed or notarized**. macOS Gatekeeper may block the download; building from source is recommended. No signing certificates or Apple account credentials are included.
+
+          An Apple Music subscription is required for streaming. Library access and playback have worked in local testing, but are not verified on every Mac. Catalog API search and For You require separate MusicKit App ID registration. Public discovery adapters are experimental.
+
+          Download the ZIP and its SHA-256 checksum together. CI tests do not sign in to Apple Music or test subscription playback.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 \
+            --verify-tag --prerelease --title "Pip $GITHUB_REF_NAME" \
+            --notes-file release-notes.md --generate-notes
