@@ -4,6 +4,8 @@
 
 A small, native macOS Apple Music player. SwiftUI + MusicKit, macOS 14+, no webview or third-party dependencies. Inspired by [Cider](https://cider.sh/), with an independent implementation.
 
+![Pip on macOS showing iTunes search results and playback controls](docs/images/pip-screenshot.png)
+
 **Experimental:** library browsing and independent subscription playback have worked in local testing with ad hoc signing. This is not a guarantee for every Mac. Full catalog API search and personalized recommendations require a registered MusicKit App ID.
 
 ## Features
